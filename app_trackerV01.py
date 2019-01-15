@@ -14,7 +14,7 @@
 # limitations under the License.
 #
 
-import os
+import time
 from flask import Flask
 from queue import Queue
 try:
@@ -27,7 +27,7 @@ monkey.patch_all()
 app = Flask(__name__)
 app.config.from_object('config')
 # app.queue = queue.LifoQueue()
-app.queue = Queue(1)
+app.queue = Queue(5)
 socketio = SocketIO(app)
 
 
@@ -54,6 +54,12 @@ def draw_label(image, point, label, font=cv2.FONT_HERSHEY_SIMPLEX, font_scale=1,
 def base64_to_pil_image(base64_img):
     return Image.open(BytesIO(base64.b64decode(base64_img)))
 
+def convert_to_JPEG(np_image_frame):
+    # np_image_color = cv2.cvtColor(np_image_frame, cv2.COLOR_BGR2RGB)
+    image = Image.fromarray(np_image_frame)
+    with BytesIO() as f:
+        image.save(f, format='JPEG')
+        return f.getvalue()
 
 @app.route("/")
 def index():
@@ -92,17 +98,19 @@ def gen():
     tracker2 = cv2.MultiTracker_create()
 
     while True:
+        start_time = time.time()
         # input_img = base64_to_pil_image(app.queue.get().split('base64')[-1])
         try:
             input_img = base64_to_pil_image(app.queue.get_nowait().split('base64')[-1])
         except:
             input_img = base64_to_pil_image(app.queue.get().split('base64')[-1])
 
-        input_img.save("t3.jpg")
+        # input_img.save("t3.jpg")
+        img_np_frame = np.array(input_img)
 
         print(app.queue.qsize())
         print("______")
-        if app.queue.qsize()>1:
+        if app.queue.qsize()>3:
             while not app.queue.empty():
                 try:
                     app.queue.get(False)
@@ -114,7 +122,8 @@ def gen():
         print("======")
 
         img_idx+=1
-        img_pil = np.asarray(Image.open('t3.jpg'))
+        # img_pil = np.asarray(Image.open('t3.jpg'))
+        img_pil = img_np_frame
         img_h, img_w, _ = np.shape(img_pil)
         img_np_frame=img_pil
         if img_idx % nm_frame2model == 0:
@@ -125,8 +134,13 @@ def gen():
                 tracker_failure=False
                 init_ZERO_precidt=True
 
-            my_files = {'image': open('t3.jpg', 'rb'), 'Content-Type': 'multipart/form-data',
+            image = convert_to_JPEG(img_np_frame)
+            my_files = {'image': image,
+                        'Content-Type': 'multipart/form-data',
                         'accept': 'application/json'}
+
+            # my_files = {'image': open('t3.jpg', 'rb'), 'Content-Type': 'multipart/form-data',
+            #             'accept': 'application/json'}
 
             r = requests.post('http://localhost:5000/model/predict', files=my_files , json={"key": "value"})
 
@@ -154,10 +168,13 @@ def gen():
                         cv2.rectangle(img_np_frame, p1, p2, (255, 255, 0), 2, 1)
                         trker_label_idx_empty_data+=1
                         print(" Face detector failed => using tracking")
+                # cv2.imwrite('t1.jpg', img_np_frame)
+                # yield (b'--img_np_frame\r\n'
+                #        b'Content-Type: image/jpeg\r\n\r\n' + open('t1.jpg', 'rb').read() + b'\r\n')
 
-                cv2.imwrite('t1.jpg', img_np_frame)
-                yield (b'--img_np_frame\r\n'
-                       b'Content-Type: image/jpeg\r\n\r\n' + open('t1.jpg', 'rb').read() + b'\r\n')
+                result_image = convert_to_JPEG(img_np_frame)
+                yield (b'--frame\r\n'
+                       b'Content-Type: image/jpeg\r\n\r\n' + result_image + b'\r\n')
 
             else:
                 if ebar_frame_counter+2>ebar_skip_frame or img_idx % nm_frame2model == 0:
@@ -233,16 +250,24 @@ def gen():
                             break
                 ini_TK_flag = False
         except:
-            # the part only runs in the very beginning
-            cv2.imwrite('t1.jpg', img_np_frame)
-            yield (b'--img_np_frame\r\n'
-                   b'Content-Type: image/jpeg\r\n\r\n' + open('t1.jpg', 'rb').read() + b'\r\n')
-        img_np_frame = cv2.cvtColor(img_np_frame, cv2.COLOR_BGR2RGB)
-        cv2.imwrite('t1.jpg', img_np_frame)
-        fh = open("./t1.jpg", "rb")
-        frame = fh.read()
-        fh.close()
+            # # the part only runs in the very beginning
+            # cv2.imwrite('t1.jpg', img_np_frame)
+            # yield (b'--img_np_frame\r\n'
+            #        b'Content-Type: image/jpeg\r\n\r\n' + open('t1.jpg', 'rb').read() + b'\r\n')
+            result_image = convert_to_JPEG(img_np_frame)
+            yield (b'--frame\r\n'
+                   b'Content-Type: image/jpeg\r\n\r\n' + result_image + b'\r\n')
+
+        # img_np_frame = cv2.cvtColor(img_np_frame, cv2.COLOR_BGR2RGB)
+        # cv2.imwrite('t1.jpg', img_np_frame)
+        # fh = open("./t1.jpg", "rb")
+        # frame = fh.read()
+        # fh.close()
+        # yield (b'--frame\r\n'
+        #        b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+        result_image = convert_to_JPEG(img_np_frame)
         yield (b'--frame\r\n'
-               b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+               b'Content-Type: image/jpeg\r\n\r\n' + result_image + b'\r\n')
+        print("Elapsed time: " + str(time.time() - start_time))
 if __name__ == "__main__":
     socketio.run(app, host='0.0.0.0', port=7000)
