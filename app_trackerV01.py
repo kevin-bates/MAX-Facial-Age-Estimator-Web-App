@@ -16,7 +16,7 @@
 
 import os
 from flask import Flask
-from queue import Queue
+import queue
 try:
     from flask.ext.socketio import SocketIO, emit
 except ImportError:
@@ -26,7 +26,7 @@ monkey.patch_all()
 
 app = Flask(__name__)
 app.config.from_object('config')
-app.queue = Queue()
+app.queue = queue.LifoQueue()
 socketio = SocketIO(app)
 
 from io import BytesIO
