@@ -16,7 +16,7 @@
 
 import os
 from flask import Flask
-import queue
+from queue import Queue
 try:
     from flask.ext.socketio import SocketIO, emit
 except ImportError:
@@ -26,8 +26,10 @@ monkey.patch_all()
 
 app = Flask(__name__)
 app.config.from_object('config')
-app.queue = queue.LifoQueue()
+# app.queue = queue.LifoQueue()
+app.queue = Queue(1)
 socketio = SocketIO(app)
+
 
 from io import BytesIO
 import base64
@@ -90,8 +92,26 @@ def gen():
     tracker2 = cv2.MultiTracker_create()
 
     while True:
-        input_img = base64_to_pil_image(app.queue.get().split('base64')[-1])
+        # input_img = base64_to_pil_image(app.queue.get().split('base64')[-1])
+        try:
+            input_img = base64_to_pil_image(app.queue.get_nowait().split('base64')[-1])
+        except:
+            input_img = base64_to_pil_image(app.queue.get().split('base64')[-1])
+
         input_img.save("t3.jpg")
+
+        print(app.queue.qsize())
+        print("______")
+        if app.queue.qsize()>1:
+            while not app.queue.empty():
+                try:
+                    app.queue.get(False)
+                except Empty:
+                    continue
+                app.queue.task_done()
+
+        print(app.queue.qsize())
+        print("======")
 
         img_idx+=1
         img_pil = np.asarray(Image.open('t3.jpg'))
