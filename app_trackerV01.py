@@ -79,7 +79,7 @@ def video_feed():
 def gen():
     ebar_skip_frame=25
     ebar_frame_counter=0
-    nm_frame2model=20
+    nm_frame2model=10
     img_idx = 0
     label_array = [[] for i in range(1)]
     label= ['']
