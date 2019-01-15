@@ -46,21 +46,19 @@ function initEvents() {
 
 
 function WebcamON(e) {
-  video.height = 240;
-  video.width = 320;
+if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+ throw new Error('Browser API navigator.mediaDevices.getUserMedia not available');
+}
+  video.height = 720;
+  video.width = 1280;
 
-//  setTimeout(function(){
-//    console.log('reload');
-//    window.location.reload();
-//   }, 2000);
-
-    video.onloadedmetadata = function() {
-    console.log('in onloadedmetadata');
-    video.play();
-  };
+//    video.onloadedmetadata = function() {
+//    console.log('in onloadedmetadata');
+//    video.play();
+//  };
 
 //  navigator.getUserMedia({video: true, audio: false}, function(stream) {
-  navigator.mediaDevices.getUserMedia({ audio: false, video: true }, video: { width: 240, height: 320 })
+  navigator.mediaDevices.getUserMedia({ audio: false, video: { width: 720, height: 480 }})
     .then(function(stream) {
         console.log('after getUserMedia');
         video.srcObject = stream;
