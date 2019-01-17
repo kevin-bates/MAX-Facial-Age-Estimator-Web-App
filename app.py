@@ -83,7 +83,6 @@ def video_feed():
     """Video streaming route. Put this in the src attribute of an img tag."""
     return Response(gen(),
                     mimetype='multipart/x-mixed-replace; boundary=frame')
-
 def gen():
     ebar_skip_frame=25
     ebar_frame_counter=0
@@ -99,30 +98,13 @@ def gen():
 
     while True:
         start_time = time.time()
-        # input_img = base64_to_pil_image(app.queue.get().split('base64')[-1])
         try:
             input_img = base64_to_pil_image(app.queue.get_nowait().split('base64')[-1])
         except:
             input_img = base64_to_pil_image(app.queue.get().split('base64')[-1])
 
-        # input_img.save("t3.jpg")
         img_np_frame = np.array(input_img)
-
-        print(app.queue.qsize())
-        print("______")
-        if app.queue.qsize()>3:
-            while not app.queue.empty():
-                try:
-                    app.queue.get(False)
-                except Empty:
-                    continue
-                app.queue.task_done()
-
-        print(app.queue.qsize())
-        print("======")
-
         img_idx+=1
-        # img_pil = np.asarray(Image.open('t3.jpg'))
         img_pil = img_np_frame
         img_h, img_w, _ = np.shape(img_pil)
         img_np_frame=img_pil
@@ -138,12 +120,7 @@ def gen():
             my_files = {'image': image,
                         'Content-Type': 'multipart/form-data',
                         'accept': 'application/json'}
-
-            # my_files = {'image': open('t3.jpg', 'rb'), 'Content-Type': 'multipart/form-data',
-            #             'accept': 'application/json'}
-
             r = requests.post('http://localhost:5000/model/predict', files=my_files , json={"key": "value"})
-
             json_str = json.dumps(r.json())
             data = json.loads(json_str)
 
@@ -168,10 +145,6 @@ def gen():
                         cv2.rectangle(img_np_frame, p1, p2, (255, 255, 0), 2, 1)
                         trker_label_idx_empty_data+=1
                         print(" Face detector failed => using tracking")
-                # cv2.imwrite('t1.jpg', img_np_frame)
-                # yield (b'--img_np_frame\r\n'
-                #        b'Content-Type: image/jpeg\r\n\r\n' + open('t1.jpg', 'rb').read() + b'\r\n')
-
                 result_image = convert_to_JPEG(img_np_frame)
                 yield (b'--frame\r\n'
                        b'Content-Type: image/jpeg\r\n\r\n' + result_image + b'\r\n')
@@ -233,7 +206,6 @@ def gen():
                         # avoid overlap draw
                         init_ZERO_precidt=True
                         tracker2 = cv2.MultiTracker_create()
-
                         tker_rst, boxes = tracker.update(img_np_frame)
                         if tker_rst:
                             trker_label_idx = 0
@@ -250,21 +222,9 @@ def gen():
                             break
                 ini_TK_flag = False
         except:
-            # # the part only runs in the very beginning
-            # cv2.imwrite('t1.jpg', img_np_frame)
-            # yield (b'--img_np_frame\r\n'
-            #        b'Content-Type: image/jpeg\r\n\r\n' + open('t1.jpg', 'rb').read() + b'\r\n')
             result_image = convert_to_JPEG(img_np_frame)
             yield (b'--frame\r\n'
                    b'Content-Type: image/jpeg\r\n\r\n' + result_image + b'\r\n')
-
-        # img_np_frame = cv2.cvtColor(img_np_frame, cv2.COLOR_BGR2RGB)
-        # cv2.imwrite('t1.jpg', img_np_frame)
-        # fh = open("./t1.jpg", "rb")
-        # frame = fh.read()
-        # fh.close()
-        # yield (b'--frame\r\n'
-        #        b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
         result_image = convert_to_JPEG(img_np_frame)
         yield (b'--frame\r\n'
                b'Content-Type: image/jpeg\r\n\r\n' + result_image + b'\r\n')
